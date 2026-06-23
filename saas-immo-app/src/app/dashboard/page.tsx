@@ -8,11 +8,25 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/connexion");
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("full_name, agency_id, agencies(name)")
+    .select("full_name, agency_id")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profileError) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-paper px-6">
+        <div className="text-center max-w-md border border-line rounded-lg bg-white p-8">
+          <p className="font-display text-xl text-ink mb-2">
+            Erreur de chargement
+          </p>
+          <p className="text-ink/60 text-sm mb-6">{profileError.message}</p>
+          <SignOutButton />
+        </div>
+      </main>
+    );
+  }
 
   if (!profile) {
     return (
@@ -21,16 +35,23 @@ export default async function DashboardPage() {
           <p className="font-display text-xl text-ink mb-2">
             Profil non configuré
           </p>
-          <p className="text-ink/60 text-sm">
+          <p className="text-ink/60 text-sm mb-6">
             Votre compte est créé mais n&apos;est encore lié à aucune agence.
             Contactez l&apos;administrateur pour finaliser la configuration.
           </p>
+          <SignOutButton />
         </div>
       </main>
     );
   }
 
   const agencyId = profile.agency_id;
+
+  const { data: agency } = await supabase
+    .from("agencies")
+    .select("name")
+    .eq("id", agencyId)
+    .maybeSingle();
 
   const [{ count: leadsCount }, { count: propertiesCount }, { count: appointmentsCount }] =
     await Promise.all([
@@ -49,7 +70,7 @@ export default async function DashboardPage() {
         .gte("scheduled_at", new Date().toISOString()),
     ]);
 
-  const agencyName = (profile as any)?.agencies?.name ?? "votre agence";
+  const agencyName = agency?.name ?? "votre agence";
 
   return (
     <main className="min-h-screen bg-paper">
